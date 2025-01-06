@@ -1,10 +1,9 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Illustration for RegGSCA Prime package                                  %
+% Illustration for GSCA.Reg_Prime package                                 %
 %   Author: Gyeongcheol Cho                                               %
-%   Last Revision Date: September 26, 2024                                %  
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Description:                                                            %
-%   - This code aims to illustrate how to use RegGSCA Prime package.      %
+%   - This code aims to illustrate how to use GSCA.Reg_Prime package.     %
 %   - The dataset is a replica of the ACSI data used in Cho (submitted).  %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % References                                                              %
