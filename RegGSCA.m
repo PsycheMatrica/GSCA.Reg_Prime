@@ -1,9 +1,8 @@
-function [INI,TABLE,ETC]=RegGSCA(Data,W,C,B,vecLambda,KxK,N_Boot,Max_iter,Min_limit,Flag_Parallel)
+function Results=RegGSCA(Data,W,C,B,vecLambda,KxK,N_Boot,Max_iter,Min_limit,Flag_Parallel)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % RegGSCA() - MATLAB function to perform Regularized Generalized          %
 %               Structured Component Analysis (GSCA).                     %
 % Author: Gyeongcheol Cho                                                 %
-% Last Revision Date: September 26, 2024                                  % 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Input arguments:                                                        %
 %   Data = an N by J matrix of scores for N individuals on J indicators   %
@@ -22,7 +21,11 @@ function [INI,TABLE,ETC]=RegGSCA(Data,W,C,B,vecLambda,KxK,N_Boot,Max_iter,Min_li
 %   Flag_Parallel = Logical value to determine whether to use parallel    %
 %                   computing for bootstrapping                           %
 % Output arguments:                                                       %
-%   INI: Strucutre array containing goodness-of-fit values, R-squared     % 
+%   Results: Structure array containing (1) results from the original     %
+%       sample (INI); (2) summary tables with standard errors and         %
+%       confidence intervals (TABLE); and (3) bootstrap estimates for     %
+%       various parameter sets (ETC).                                     %    
+%   .INI: Strucutre array containing goodness-of-fit values, R-squared    % 
 %        values, and matrices parameter estimates                         %
 %     .GoF = [FIT_D,   OPE_D;                                             %
 %             FIT_M_D, OPE_M_D;                                           %
@@ -38,12 +41,12 @@ function [INI,TABLE,ETC]=RegGSCA(Data,W,C,B,vecLambda,KxK,N_Boot,Max_iter,Min_li
 %     .minVE: minimum value of the validation error                       %
 %     .LamVE: a matrix of lambda values and their corresponding           %
 %             validation errors                                           %
-%  TABLE: Structure array containing tables of parameter estimates, their %
+%  .TABLE: Structure array containing tables of parameter estimates, their%
 %         SEs, 95% CIs,and other statistics                               %
 %     .W: Table for weight estimates                                      %
 %     .C: Table for loading estimates                                     %
 %     .B: Table for path coefficients estimates                           %
-%  ETC: Structure array including bootstrapped parameter estmates       %
+%  .ETC: Structure array including bootstrapped parameter estmates        %
 %     .W_Boot: Matrix of bootstrapped weight estimates                    %
 %     .C_Boot: Matrix of bootstrapped loading estimates                   %
 %     .B_Boot: Matrix of bootstrapped path coefficient estimates          %
@@ -273,6 +276,9 @@ end
         ETC.C_Boot=C_Boot;
         ETC.B_Boot=B_Boot;  
     end
+Results.INI=INI;
+Results.TABLE=TABLE;
+Results.ETC=ETC;
 end
 function Table=para_stat(est_mt,boot_mt,CI_mp,delOPE_p_q_Boot)
     flag_pet = true;

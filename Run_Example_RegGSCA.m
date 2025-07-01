@@ -35,11 +35,14 @@ KxK=[1,5];
 Max_iter = 1000;
 Min_limit = 10^(-8);
 Flag_Parallel = false;
-[INI,TABLE,ETC]=RegGSCA(Data{:,:},W0,C0,B0,vecLambda0,KxK,N_Boot,Max_iter,Min_limit,Flag_Parallel);
-INI
-INI_reg.minVE
-INI_reg.LamVE
-INI_reg.lambda_optimal
+Results=RegGSCA(Data{:,:},W0,C0,B0,vecLambda0,KxK,N_Boot,Max_iter,Min_limit,Flag_Parallel);
+INI=Results.INI;
+TABLE=Results.TABLE;
+ETC=Results.ETC;
+
+INI.minVE
+INI.LamVE
+INI.lambda_optimal
 INI.GoF
 INI.W
 INI.C
