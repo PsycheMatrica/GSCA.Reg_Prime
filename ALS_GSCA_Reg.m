@@ -1,4 +1,4 @@
-function [W,C,B,vec_err]=ALS_Reg(Z,W,W0,C0,B0,ind_Adep,lambda_b,Min_limit,Max_iter,N,J,P,T,Jy,Py,loc_Cdep,loc_Bdep)
+function [W,C,B,vec_err]=ALS_GSCA_Reg(Z,W,W0,C0,B0,ind_Adep,lambda_b,Min_limit,Max_iter,N,J,P,T,Jy,Py,loc_Cdep,loc_Bdep)
 % to set initial value, and check the characteristics of Data
     iter=0;
     improve=100000000;
