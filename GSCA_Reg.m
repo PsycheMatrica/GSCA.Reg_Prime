@@ -1,6 +1,6 @@
-function Results=RegGSCA(Data,W,C,B,vecLambda,KxK,N_Boot,Max_iter,Min_limit,Flag_Parallel)
+function Results=GSCA_Reg(Data,W,C,B,vecLambda,KxK,N_Boot,Max_iter,Min_limit,Flag_Parallel)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% RegGSCA() - MATLAB function to perform Regularized Generalized          %
+% GSCA_Reg() - MATLAB function to perform Regularized Generalized          %
 %               Structured Component Analysis (GSCA).                     %
 % Author: Gyeongcheol Cho                                                 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -126,7 +126,7 @@ end
                     parfor n_l=1:N_lambda
                         vecLambda_tp=vecLambda;
                         lambda_b=vecLambda_tp(1,n_l);
-                        [W_tr,C_tr,B_tr,~]=ALS_Reg(Z_tr,W,W0,C0,B0,ind_Adep,lambda_b,Min_limit,Max_iter,N_tr,J,P,T,Jy,Py,loc_Cdep,loc_Bdep);
+                        [W_tr,C_tr,B_tr,~]=ALS_GSCA_Reg(Z_tr,W,W0,C0,B0,ind_Adep,lambda_b,Min_limit,Max_iter,N_tr,J,P,T,Jy,Py,loc_Cdep,loc_Bdep);
                         CV_tt=Z_tt*W_tr;
                         e_tt=[Z_tt,CV_tt]-CV_tt*[C_tr,B_tr];
                         vecVE=sum(e_tt(:,ind_Adep).^2,1)/N_tt;
@@ -136,7 +136,7 @@ end
                     for n_l=1:N_lambda
                         vecLambda_tp=vecLambda;
                         lambda_b=vecLambda_tp(1,n_l);
-                        [W_tr,C_tr,B_tr,~]=ALS_Reg(Z_tr,W,W0,C0,B0,ind_Adep,lambda_b,Min_limit,Max_iter,N_tr,J,P,T,Jy,Py,loc_Cdep,loc_Bdep);
+                        [W_tr,C_tr,B_tr,~]=ALS_GSCA_Reg(Z_tr,W,W0,C0,B0,ind_Adep,lambda_b,Min_limit,Max_iter,N_tr,J,P,T,Jy,Py,loc_Cdep,loc_Bdep);
                         CV_tt=Z_tt*W_tr;
                         e_tt=[Z_tt,CV_tt]-CV_tt*[C_tr,B_tr];
                         vecVE=sum(e_tt(:,ind_Adep).^2,1)/N_tt;
@@ -154,7 +154,7 @@ end
     INI.LamVE=LamVE;
     INI.lambda_optimal=lambda_optimal;
 %% (3) Estimation of paramters
-    [est_W,est_C,est_B,vec_err]=ALS_Reg(Z,W,W0,C0,B0,ind_Adep,lambda_optimal,Min_limit,Max_iter,N,J,P,T,Jy,Py,loc_Cdep,loc_Bdep);            
+    [est_W,est_C,est_B,vec_err]=ALS_GSCA_Reg(Z,W,W0,C0,B0,ind_Adep,lambda_optimal,Min_limit,Max_iter,N,J,P,T,Jy,Py,loc_Cdep,loc_Bdep);            
     R_squared_dep=ones(1,Ty)-vec_err;
     R_squared=zeros(1,T);
     R_squared(1,ind_Adep)=R_squared_dep;
@@ -190,7 +190,7 @@ end
                 [Z_ib,Z_oob]=GC_Boot(Z);
                 mean_Z_ib=mean(Z_ib);
                 std_Z_ib=std(Z_ib,1);
-                [W_b,C_b,B_b,~]=ALS_Reg(Z_ib,W,W0,C0,B0,ind_Adep,lambda_optimal,Min_limit,Max_iter,size(Z_ib,1),J,P,T,Jy,Py,loc_Cdep,loc_Bdep);            
+                [W_b,C_b,B_b,~]=ALS_GSCA_Reg(Z_ib,W,W0,C0,B0,ind_Adep,lambda_optimal,Min_limit,Max_iter,size(Z_ib,1),J,P,T,Jy,Py,loc_Cdep,loc_Bdep);            
                 W_Boot(:,b)=W_b(W0);
                 C_Boot(:,b)=C_b(C0);
                 B_Boot(:,b)=B_b(B0);
@@ -226,7 +226,7 @@ end
                 [Z_ib,Z_oob]=GC_Boot(Z);
                 mean_Z_ib=mean(Z_ib);
                 std_Z_ib=std(Z_ib,1);
-                [W_b,C_b,B_b,~]=ALS_Reg(Z_ib,W,W0,C0,B0,ind_Adep,lambda_optimal,Min_limit,Max_iter,size(Z_ib,1),J,P,T,Jy,Py,loc_Cdep,loc_Bdep);            
+                [W_b,C_b,B_b,~]=ALS_GSCA_Reg(Z_ib,W,W0,C0,B0,ind_Adep,lambda_optimal,Min_limit,Max_iter,size(Z_ib,1),J,P,T,Jy,Py,loc_Cdep,loc_Bdep);            
                 W_Boot(:,b)=W_b(W0);
                 C_Boot(:,b)=C_b(C0);
                 B_Boot(:,b)=B_b(B0);
