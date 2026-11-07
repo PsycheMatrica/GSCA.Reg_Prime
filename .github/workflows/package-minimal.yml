@@ -1,0 +1,36 @@
+name: Package completed minimal GSCA results
+
+on:
+  push:
+    branches: [research/indicator-auxiliary-minimal-20261106]
+    paths:
+      - .github/workflows/package-minimal.yml
+      - research/package_minimal_results.py
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Validate and package the completed numerical run
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          python research/package_minimal_results.py
+          --repo PsycheMatrica/GSCA.Reg_Prime
+          --run-id 42339690205
+          --artifact-root minimal_source_artifacts
+          --output-dir minimal_package
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gsca-minimal-completed-package
+          path: minimal_package/
+          if-no-files-found: error
+          compression-level: 0
