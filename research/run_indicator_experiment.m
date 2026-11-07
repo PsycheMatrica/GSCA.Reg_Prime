@@ -11,8 +11,6 @@ function Results = run_indicator_experiment(experiment,overrides)
 %   run_indicator_experiment('nested_n80_sample_boundary_inner199')
 %   run_indicator_experiment('nested_n80_oracle_boundary')
 %   run_indicator_experiment('nested_n200_hetero_sample_boundary')
-% Add _part1, _part2, _part3, or _part4 to a listed nested experiment name to
-% execute one deterministic quarter of its original replication range.
 % overrides can change counts, Lambda sets, output location, etc.
 % No job is automatically launched by opening this file.
 if nargin<1 || isempty(experiment), experiment='smoke'; end
@@ -21,12 +19,8 @@ experiment=char(experiment);
 if ~isstruct(overrides)||~isscalar(overrides)
     error('gsca:IndicatorExperiment','overrides must be a scalar structure.');
 end
-shard=regexp(experiment,'^(nested_.+)_part([1-4])$','tokens','once');
-part=0;
-if ~isempty(shard), experiment=shard{1}; part=str2double(shard{2}); end
-outputDir=fullfile(fileparts(mfilename('fullpath')),'results_indicator',experiment);
-if part>0, outputDir=fullfile(outputDir,sprintf('part%d',part)); end
-common=struct('OutputDir',outputDir);
+common=struct('OutputDir',fullfile(fileparts(mfilename('fullpath')), ...
+    'results_indicator',experiment));
 tokens=regexp(experiment,'^primary_n(80|200)_jp(1|3)$','tokens','once');
 if ~isempty(tokens)
     common.Ns=str2double(tokens{1}); common.Jps=str2double(tokens{2});
@@ -58,19 +52,6 @@ else
         otherwise
             error('gsca:IndicatorExperiment','Unknown experiment: %s',experiment);
     end
-end
-if part>0
-    allowed={'nested_n80_sample_boundary','nested_n80_sample_positive', ...
-        'nested_n80_sample_boundary_inner199','nested_n80_oracle_boundary', ...
-        'nested_n200_hetero_sample_boundary'};
-    if ~ismember(experiment,allowed)
-        error('gsca:IndicatorExperiment','This experiment has no four-part schedule: %s',experiment);
-    end
-    baseReplications=200;
-    if isfield(common,'Replications'), baseReplications=common.Replications; end
-    common.TotalReplications=baseReplications;
-    common.Replications=baseReplications/4;
-    common.ReplicationStart=(part-1)*common.Replications+1;
 end
 fields=fieldnames(overrides);
 for k=1:numel(fields), common.(fields{k})=overrides.(fields{k}); end

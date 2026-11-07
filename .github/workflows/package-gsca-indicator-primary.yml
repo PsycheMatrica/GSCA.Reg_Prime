@@ -1,0 +1,58 @@
+name: Package completed GSCA indicator primary study
+on:
+  push:
+    branches: [research/oob-correction-20261106]
+    paths: ['.github/workflows/package-gsca-indicator-primary.yml']
+permissions:
+  contents: read
+  actions: read
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify completed numerical jobs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for job in 128296064308 128296064360 128296064399 128296064451 128296333328; do
+            outcome=$(gh api repos/PsycheMatrica/GSCA.Reg_Prime/actions/jobs/$job --jq .conclusion)
+            test "$outcome" = "success"
+          done
+      - name: Download preserved primary and example results
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download 42336898888 --pattern 'gsca-indicator-primary_*' --dir source_artifacts/primary
+          gh run download 42337087534 --name gsca-indicator-validation --dir source_artifacts/validation
+      - name: Package complete outputs and verify transfer
+        run: |
+          python - <<'PY'
+          import base64, hashlib, json, os, pathlib, zipfile
+          repo=pathlib.Path("."); dest=repo/"primary_bundle"; dest.mkdir()
+          meta={"primary_run":42336898888,"primary_commit":"c0f48f19c7c4f4aab2aa6f5b7d5d9572be453fa2","example_run":42337087534,"package_source_commit":os.environ["GITHUB_SHA"],"scope":"Four completed primary jobs (96 rows, 9600 dataset analyses, 1910400 OOB fits) and existing ACSI replica. Cancelled nested experiments are not included.","runtime":"MATLAB R2026a","interpretation":"Fixed indicator targets; variance correction is exploratory, not a proven finite-N risk correction or validated test."}
+          (dest/"manifest.json").write_text(json.dumps(meta,indent=2),encoding="utf-8")
+          zp=dest/"GSCA_Indicator_Primary_Package.zip"
+          files=list((repo/"research").glob("*.m"))+[repo/"research/README_indicator.md",repo/"research/GSCA_Indicator_Correction_Report_KO.md"]
+          files += [repo/p for p in ["ACSI_Comp_Replica.csv","GSCA_Reg.m","ALS_GSCA_Reg.m","GC_Boot.m","Run_Example_GSCA_Reg.m"]]
+          files += list((repo/"research/results_indicator").glob("GSCA_Indicator_Primary_*.csv"))+list((repo/"research/results_indicator").glob("GSCA_Indicator_Primary_*.json"))
+          with zipfile.ZipFile(zp,"w",compression=zipfile.ZIP_DEFLATED,compresslevel=9) as z:
+           for p in sorted(files):
+            if p.is_file(): z.write(p,"code/"+p.as_posix())
+           for p in sorted((repo/"source_artifacts").rglob("*")):
+            if p.is_file(): z.write(p,"results/raw/"+p.relative_to(repo/"source_artifacts").as_posix())
+           z.write(dest/"manifest.json","manifest.json")
+          data=zp.read_bytes()
+          meta={"name":zp.name,"bytes":len(data),"sha256":hashlib.sha256(data).hexdigest(),"git_blob":hashlib.sha1(("blob "+str(len(data))+"\0").encode()+data).hexdigest()}
+          print("PRIMARY_PACKAGE_META "+json.dumps(meta))
+          print("PRIMARY_PACKAGE_BEGIN")
+          b=base64.b64encode(data).decode()
+          for k in range(0,len(b),8192): print(b[k:k+8192])
+          print("PRIMARY_PACKAGE_END")
+          
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gsca-indicator-completed-primary-package
+          path: primary_bundle/

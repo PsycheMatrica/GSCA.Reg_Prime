@@ -2,6 +2,8 @@
 
 This research extension evaluates structural paths on **fixed observed target indicators**. The old component-target functions, simulations and results remain available for comparison.
 
+**Current status:** the completed study evaluates raw and variance-corrected point estimates with Outer=0. Nested experiments were stopped; an outer bootstrap is not a solution to the mismatch between bootstrap/OOB training risk and the original finite-N target. No calibrated GSCA predictive significance test is claimed.
+
 ## Research progression and estimand
 
 The research program progresses from finite-sample MLR under multivariate normality, through resampling-based MLR and single-outcome ERA (predictor blocks), to GSCA (predictor and outcome blocks).
@@ -71,7 +73,7 @@ Failed draws are retained in diagnostics and invalidate the estimator; no silent
 
     addpath('research');
     out = gsca_indicator_predictive(Data,W0,C0,B0,struct( ...
-        'Boot',199,'Outer',199,'InnerBoot',99,'Lambda',0,'Seed',20261107));
+        'Boot',199,'Outer',0,'InnerBoot',99,'Lambda',0,'Seed',20261107));
 
 - B-only edge order is MATLAB find(B0), available in out.edges.
 - Main fields: deltaRaw, correction, deltaCorrected; pRaw/pShifted and their lower bounds; pOuterRaw/pOuterCorrected and their lower bounds.
@@ -88,7 +90,7 @@ Failed draws are retained in diagnostics and invalidate the estimator; no silent
     test_gsca_indicator_maps; test_gsca_indicator_predictive;
     run_indicator_experiment('smoke');
     run_indicator_experiment('primary_n80_jp3');
-    run_indicator_experiment('nested_n80_sample_boundary');
+    % Outer bootstrap options are retained as experimental diagnostics only.
 
 Independent tests reconstruct singleton OLS bootstrap estimates directly, verify coordinate aggregation, projection, absence of target-input leakage, raw-unit transformations, fixed-outcome variance equality, equal-observation weighting, nested reference recomputation, and common random streams across inner budgets.
 
@@ -101,9 +103,8 @@ $
 $
 Other boundaries are independently calibrated for the new indicator target. Population affine risk integration eliminates test-sample MC noise, but training-sample MC error remains and is reported. Boundary labels without an analytic formula are near-boundary candidates, not known exact nulls.
 
-Primary jobs cover $N=80,200$, $J_p=1,3$, $\lambda=0,.1$, normal/heteroscedastic errors, coefficient zero/near-boundary/.30 and oracle/sample references. Nested jobs focus on representative and robustness conditions. Inner99/199 comparison uses identical original and outer datasets and the same prefix of inner samples. Each job saves CSV, JSON, MAT, seeds and failure diagnostics.
+Primary jobs cover $N=80,200$, $J_p=1,3$, $\lambda=0,.1$, normal/heteroscedastic errors, coefficient zero/near-boundary/.30 and oracle/sample references. The five planned nested jobs were stopped and are not included in the completed evidence. Each completed primary job saves CSV, JSON, MAT, seeds and failure diagnostics.
 
 The old six-component manuscript simulation has not been replaced by this controlled experiment. The optional run_indicator_example function evaluates the existing ACSI replica as a practical integration check; it does not provide simulation truth or validate nested inference.
 
 See GSCA_Indicator_Correction_Report_KO.md for completed results and limitations.
-

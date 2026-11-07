@@ -37,7 +37,6 @@ for k=1:numel(names)
     end
     cfg.(names{k})=overrides.(names{k});
 end
-if isempty(cfg.TotalReplications), cfg.TotalReplications=cfg.Replications; end
 validate_config(cfg);
 if ~exist(cfg.OutputDir,'dir'), mkdir(cfg.OutputDir); end
 records=repmat(blank_record(),0,1);
@@ -102,8 +101,7 @@ for ni=1:numel(cfg.Ns)
                     for ri=1:numel(cfg.ReferenceModes)
                         reference=cfg.ReferenceModes{ri};
                         firstRecord=numel(records)+1;
-                        for localRep=1:cfg.Replications
-                            rep=cfg.ReplicationStart+localRep-1;
+                        for rep=1:cfg.Replications
                             row=blank_record();
                             row.Condition=condition; row.N=n; row.Jp=jp;
                             row.Lambda=lambda; row.DGP=dgp; row.Effect=effect;
@@ -148,9 +146,9 @@ for ni=1:numel(cfg.Ns)
                                 end
                             end
                             records(end+1,1)=row; %#ok<AGROW>
-                            if cfg.ProgressEvery>0 && (mod(localRep,cfg.ProgressEvery)==0 || localRep==cfg.Replications)
-                                fprintf('PROGRESS N=%d Jp=%d lambda=%.3g %s %s %s local=%d/%d global=%d valid=%d\n', ...
-                                    n,jp,lambda,dgp,effect,reference,localRep,cfg.Replications,rep,row.Valid);
+                            if cfg.ProgressEvery>0 && (mod(rep,cfg.ProgressEvery)==0 || rep==cfg.Replications)
+                                fprintf('PROGRESS N=%d Jp=%d lambda=%.3g %s %s %s rep=%d/%d valid=%d\n', ...
+                                    n,jp,lambda,dgp,effect,reference,rep,cfg.Replications,row.Valid);
                             end
                         end
                         block=records(firstRecord:end);
@@ -192,7 +190,6 @@ cfg.Ns=80; cfg.Jps=[1,3]; cfg.Lambdas=[0,.1];
 cfg.DGPs={'normal'}; cfg.Effects={'zero','boundary','positive'};
 cfg.ReferenceModes={'oracle','sample'};
 cfg.Replications=100; cfg.CalReplications=500; cfg.TruthReplications=1500;
-cfg.ReplicationStart=1; cfg.TotalReplications=[];
 cfg.Boot=199; cfg.Outer=0; cfg.InnerBoot=99;
 cfg.CalIterations=8; cfg.BoundaryUpper=.55; cfg.PositiveBeta=.30;
 cfg.Alpha=.05; cfg.Seed=20261107; cfg.MaxIter=1000; cfg.ProgressEvery=25;
@@ -245,15 +242,10 @@ ints={'Replications','CalReplications','TruthReplications','CalIterations','Boot
 for k=1:numel(ints), validateattributes(c.(ints{k}),{'numeric'},{'scalar','integer','>=',1}); end
 validateattributes(c.Outer,{'numeric'},{'scalar','integer','nonnegative'});
 validateattributes(c.ProgressEvery,{'numeric'},{'scalar','integer','nonnegative'});
-validateattributes(c.ReplicationStart,{'numeric'},{'scalar','integer','>=',1});
-validateattributes(c.TotalReplications,{'numeric'},{'scalar','integer','>=',1});
-if c.ReplicationStart+c.Replications-1>c.TotalReplications
-    error('gsca:InvalidReplicationRange','The requested global replication range exceeds TotalReplications.');
-end
 validateattributes(c.Alpha,{'numeric'},{'scalar','>',0,'<',1});
 validateattributes(c.Seed,{'numeric'},{'scalar','integer','nonnegative'});
-if c.CalReplications<2 || c.TruthReplications<2
-    error('gsca:InvalidSimulationCount','Use at least two calibration and truth datasets for MCSE.');
+if c.CalReplications<2 || c.TruthReplications<2 || c.Replications<2
+    error('gsca:InvalidSimulationCount','Use at least two datasets for MCSE.');
 end
 if ~iscell(c.DGPs) || ~all(ismember(c.DGPs,{'normal','heteroscedastic'})) || ...
         ~iscell(c.ReferenceModes) || ~all(ismember(c.ReferenceModes,{'oracle','sample'})) || ...
@@ -505,7 +497,6 @@ R.Notes={ ...
     'Any failed truth fit invalidates Monte Carlo truth. Analytic OLS truth remains known; numerical failures and validation status are reported separately. CompleterMean is diagnostic only.', ...
     'Bias MCSE combines independent simulation-mean uncertainty and target-estimation uncertainty; it is zero-target-uncertainty for analytic OLS truth.', ...
     'Rejection rates condition on valid datasets; always inspect failure counts.', ...
-    'Shards use global replication indices for source-data and bootstrap seeds; ReplicationStart changes scheduling only. Summary Attempted counts this shard, while TotalReplications records the intended pooled size.', ...
     'Outer bootstrap entries are NaN when Outer=0; nested_smoke is an execution check, not a calibration study.', ...
     'R=100 has rejection MCSE about .022 at p=.05; zero observed rejection does not establish zero population rejection.'};
 end

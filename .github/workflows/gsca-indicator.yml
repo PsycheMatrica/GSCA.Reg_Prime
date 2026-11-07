@@ -18,7 +18,7 @@ jobs:
       - name: Check old and new risk definitions
         uses: matlab-actions/run-command@v2
         with:
-          command: addpath('research'); test_gsca_fit; test_gsca_risk_maps; test_gsca_predictive; test_gsca_indicator_maps; test_gsca_indicator_predictive; run_indicator_experiment('smoke'); run_indicator_experiment('nested_smoke'); run_indicator_example;
+          command: addpath('research'); test_gsca_fit; test_gsca_risk_maps; test_gsca_predictive; test_gsca_indicator_maps; test_gsca_indicator_predictive; run_indicator_experiment('smoke'); run_indicator_example;
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -33,7 +33,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        experiment: [primary_n80_jp1, primary_n80_jp3, primary_n200_jp1, primary_n200_jp3, nested_n80_sample_boundary, nested_n80_sample_positive, nested_n80_oracle_boundary, nested_n200_hetero_sample_boundary, nested_n80_sample_boundary_inner199]
+        experiment: [primary_n80_jp1, primary_n80_jp3, primary_n200_jp1, primary_n200_jp3]
     steps:
       - uses: actions/checkout@v4
       - uses: matlab-actions/setup-matlab@v2
