@@ -12,9 +12,12 @@ function Results = Run_Simulation_Correction_v3(mode,overrides)
 %
 % All intervals evaluated here are ONE-SIDED lower confidence bounds.
 % p<Alpha matches empirical inverse-CDF lower-bound rejection.
-% "boundary" is a Monte Carlo calibrated candidate, not an exact null.
-% Truth is calculated from independent training samples and analytic test-
-% risk integration. Failed truth fits invalidate truth and calibration;
+% "boundary" is exact only in the analytic OLS bridge; otherwise it is a
+% Monte Carlo calibrated candidate, not an exact null.
+% The Jp=1, Lambda=0 normal OLS bridge uses its exact finite-N boundary
+% and exact risk target. Independent training draws verify that formula.
+% Other truth values use independent training samples and analytic test-risk
+% integration. Any failed fit invalidates Monte Carlo truth/calibration;
 % completer-only diagnostics are retained but never relabeled as truth.
 %
 % Requires gsca_fit, gsca_risk_maps, gsca_exact_risk, gsca_predictive,
@@ -70,8 +73,20 @@ for ni=1:numel(cfg.Ns)
                     tr.Condition=condition; tr.N=n; tr.Jp=jp; tr.Lambda=lambda;
                     tr.DGP=dgp; tr.Effect=effect; tr.Beta=beta;
                     tr.CalibrationValid=calibration.valid;
+                    tr.CalibrationMethod=calibration.method;
                     tr.TruthValid=truth.valid; tr.TruthMean=truth.mean;
-                    tr.TruthMCSE=truth.mcse; tr.TruthFailed=truth.failed;
+                    tr.TruthSource=truth.source; tr.AnalyticTruth=truth.analyticTruth;
+                    tr.TargetMCSE=truth.mcse;
+                    tr.TruthMCMean=truth.validationMean;
+                    tr.TruthMCSE=truth.validationMCSE;
+                    tr.TruthMCValid=truth.validationValid;
+                    if isfinite(tr.AnalyticTruth) && tr.TruthMCValid
+                        tr.AnalyticMinusMC=tr.AnalyticTruth-tr.TruthMCMean;
+                        if tr.TruthMCSE>0
+                            tr.ValidationZ=(tr.TruthMCMean-tr.AnalyticTruth)/tr.TruthMCSE;
+                        end
+                    end
+                    tr.TruthFailed=truth.failed;
                     tr.TruthCompleted=truth.completed; tr.TruthRequested=truth.requested;
                     tr.CompleterMean=truth.completerMean;
                     tr.CompleterMCSE=truth.completerMCSE;
@@ -125,10 +140,11 @@ for ni=1:numel(cfg.Ns)
                         summary=summarize(block,tr,cfg);
                         summaries(end+1,1)=summary; %#ok<AGROW>
                         fprintf(['SIM N=%d Jp=%d lambda=%.4g DGP=%s effect=%s ref=%s ' ...
-                            'beta=%.5f truth=%.6f (MCSE %.3g) valid=%d/%d ' ...
+                            'beta=%.5f truth=%.6f source=%s MCcheck=%.6f (SE %.3g) valid=%d/%d ' ...
                             'bias raw=%.5f corrected=%.5f rej legacy/raw/shift/outer=' ...
                             '%.3f/%.3f/%.3f/%.3f\n'], ...
-                            n,jp,lambda,dgp,effect,reference,beta,tr.TruthMean,tr.TruthMCSE, ...
+                            n,jp,lambda,dgp,effect,reference,beta,tr.TruthMean,tr.TruthSource, ...
+                            tr.TruthMCMean,tr.TruthMCSE, ...
                             summary.Completed,summary.Attempted,summary.BiasRaw, ...
                             summary.BiasCorrected,summary.RejectLegacy,summary.RejectRaw, ...
                             summary.RejectShifted,summary.RejectOuterCorrected);
@@ -207,7 +223,19 @@ end
 
 function cal=calibrate(n,jp,lambda,dgp,cfg,fitOptions,seed)
 cal=struct('valid',false,'beta',NaN,'reason','','trace',[], ...
-    'calibrationReplications',cfg.CalReplications,'iterations',0);
+    'method','Monte_Carlo_root','calibrationReplications',cfg.CalReplications,'iterations',0);
+if analytic_bridge(jp,lambda,dgp)
+    % Delta EPE=.91*b^2-(.8775-b^2-.21*b)/(N-4).
+    % Stable positive root avoids subtraction of nearly equal numbers.
+    A=.91*(n-4)+1;
+    cal.beta=2*.8775/(.21+sqrt(.21^2+4*A*.8775));
+    cal.valid=true; cal.method='analytic_OLS';
+    cal.calibrationReplications=0;
+    cal.trace=[cal.beta,analytic_delta(n,cal.beta),0,0];
+    cal.bracket=[cal.beta,cal.beta];
+    cal.reason='Exact Gaussian OLS predictive boundary; independent training draws validate implementation.';
+    return
+end
 lo=0; hi=cfg.BoundaryUpper;
 tlo=estimate_truth(n,jp,lo,lambda,dgp,cfg.CalReplications,seed,fitOptions);
 thi=estimate_truth(n,jp,hi,lambda,dgp,cfg.CalReplications,seed,fitOptions);
@@ -262,17 +290,43 @@ if t.completed>1, t.completerMCSE=std(vals(good),0)/sqrt(t.completed); end
 t.valid=all(good);
 if t.valid
     t.mean=t.completerMean; t.mcse=t.completerMCSE; t.reason='';
+    t.validationMean=t.mean; t.validationMCSE=t.mcse;
+    t.validationValid=true;
 end
+if analytic_bridge(jp,lambda,dgp)
+    % This is the ideal OLS target even if a numerical implementation fails.
+    % Keep every failure and the separate Monte Carlo validation status.
+    t.analyticTruth=analytic_delta(n,beta);
+    t.mean=t.analyticTruth; t.mcse=0; t.valid=true;
+    t.source='analytic_OLS';
+end
+end
+
+function tf=analytic_bridge(jp,lambda,dgp)
+tf=(jp==1 && lambda==0 && strcmp(dgp,'normal'));
+end
+
+function value=analytic_delta(n,beta)
+sigma2=.8775-beta^2-.21*beta;
+value=.91*beta^2-sigma2/(n-4);
 end
 
 function t=invalid_truth(R,reason)
 t=struct('valid',false,'mean',NaN,'mcse',NaN,'failed',R, ...
     'completed',0,'requested',R,'completerMean',NaN,'completerMCSE',NaN, ...
-    'values',NaN(R,1),'reason',reason);
+    'values',NaN(R,1),'reason',reason,'source','independent_training_MC', ...
+    'analyticTruth',NaN,'validationMean',NaN,'validationMCSE',NaN, ...
+    'validationValid',false);
 end
 
 function label=classify_truth(t,effect)
 if ~t.valid, label='undefined_fit_failure'; return; end
+if strcmp(t.source,'analytic_OLS')
+    if abs(t.mean)<=1e-12, label='exact_predictive_boundary';
+    elseif t.mean>0, label='positive_analytic';
+    else, label='null_interior_analytic'; end
+    return
+end
 if t.mean-1.96*t.mcse>0
     label='positive_MC_supported';
 elseif t.mean+1.96*t.mcse<0
@@ -296,22 +350,28 @@ end
 
 function t=blank_truth()
 t=struct('Condition',0,'N',0,'Jp',0,'Lambda',0,'DGP','','Effect','', ...
-    'Beta',NaN,'CalibrationValid',false,'TruthValid',false,'TruthMean',NaN, ...
-    'TruthMCSE',NaN,'TruthFailed',0,'TruthCompleted',0,'TruthRequested',0, ...
+    'Beta',NaN,'CalibrationValid',false,'CalibrationMethod','','TruthValid',false, ...
+    'TruthMean',NaN,'TruthSource','','AnalyticTruth',NaN,'TargetMCSE',NaN, ...
+    'TruthMCMean',NaN,'TruthMCSE',NaN,'TruthMCValid',false, ...
+    'AnalyticMinusMC',NaN,'ValidationZ',NaN, ...
+    'TruthFailed',0,'TruthCompleted',0,'TruthRequested',0, ...
     'CompleterMean',NaN,'CompleterMCSE',NaN,'Classification','');
 end
 
 function s=blank_summary()
 s=struct('Condition',0,'N',0,'Jp',0,'Lambda',0,'DGP','','Effect','', ...
     'Beta',NaN,'Reference','','Classification','','TruthMean',NaN, ...
-    'TruthMCSE',NaN,'TruthValid',false,'Attempted',0,'Completed',0, ...
+    'TruthMCSE',NaN,'TruthMCMean',NaN,'TruthMCValid',false, ...
+    'TruthSource','','AnalyticTruth',NaN,'TargetMCSE',NaN,'ValidationZ',NaN, ...
+    'CalibrationMethod','','TruthValid',false,'Attempted',0,'Completed',0, ...
     'DatasetFailures',0,'BootstrapFitFailures',0, ...
     'MeanRaw',NaN,'MeanCorrected',NaN,'MeanCorrection',NaN, ...
     'BiasRaw',NaN,'BiasCorrected',NaN,'RMSERaw',NaN,'RMSECorrected',NaN, ...
-    'RejectLegacy',NaN,'MCSELegacy',NaN,'RejectRaw',NaN,'MCSERaw',NaN, ...
-    'RejectShifted',NaN,'MCSEShifted',NaN, ...
-    'RejectOuterRaw',NaN,'MCSEOuterRaw',NaN,'OuterRawCompleted',0, ...
-    'RejectOuterCorrected',NaN,'MCSEOuterCorrected',NaN,'OuterCorrectedCompleted',0, ...
+    'RejectLegacy',NaN,'MCSELegacy',NaN,'RejectLegacyLo',NaN,'RejectLegacyHi',NaN, ...
+    'RejectRaw',NaN,'MCSERaw',NaN,'RejectRawLo',NaN,'RejectRawHi',NaN, ...
+    'RejectShifted',NaN,'MCSEShifted',NaN,'RejectShiftedLo',NaN,'RejectShiftedHi',NaN, ...
+    'RejectOuterRaw',NaN,'MCSEOuterRaw',NaN,'RejectOuterRawLo',NaN,'RejectOuterRawHi',NaN,'OuterRawCompleted',0, ...
+    'RejectOuterCorrected',NaN,'MCSEOuterCorrected',NaN,'RejectOuterCorrectedLo',NaN,'RejectOuterCorrectedHi',NaN,'OuterCorrectedCompleted',0, ...
     'LowerCoverageRaw',NaN,'LowerCoverageShifted',NaN, ...
     'LowerCoverageOuterRaw',NaN,'LowerCoverageOuterCorrected',NaN);
 end
@@ -322,6 +382,10 @@ copy={'Condition','N','Jp','Lambda','DGP','Effect','Beta'};
 for k=1:numel(copy), s.(copy{k})=t.(copy{k}); end
 s.Reference=rows(1).Reference; s.Classification=t.Classification;
 s.TruthMean=t.TruthMean; s.TruthMCSE=t.TruthMCSE; s.TruthValid=t.TruthValid;
+s.TruthMCMean=t.TruthMCMean; s.TruthMCValid=t.TruthMCValid;
+s.TruthSource=t.TruthSource; s.AnalyticTruth=t.AnalyticTruth;
+s.TargetMCSE=t.TargetMCSE; s.ValidationZ=t.ValidationZ;
+s.CalibrationMethod=t.CalibrationMethod;
 s.Attempted=numel(rows); good=[rows.Valid]; s.Completed=sum(good);
 s.DatasetFailures=s.Attempted-s.Completed;
 fail=[rows.FitFailures]; s.BootstrapFitFailures=sum(fail(isfinite(fail)));
@@ -338,18 +402,23 @@ if t.TruthValid
     s.LowerCoverageOuterRaw=coverage([r.LowerOuterRaw],t.TruthMean);
     s.LowerCoverageOuterCorrected=coverage([r.LowerOuterCorrected],t.TruthMean);
 end
-[s.RejectLegacy,s.MCSELegacy]=rate([r.pLegacy],cfg.Alpha);
-[s.RejectRaw,s.MCSERaw]=rate([r.pRaw],cfg.Alpha);
-[s.RejectShifted,s.MCSEShifted]=rate([r.pShifted],cfg.Alpha);
-[s.RejectOuterRaw,s.MCSEOuterRaw,s.OuterRawCompleted]=rate([r.pOuterRaw],cfg.Alpha);
-[s.RejectOuterCorrected,s.MCSEOuterCorrected,s.OuterCorrectedCompleted]= ...
+[s.RejectLegacy,s.MCSELegacy,~,s.RejectLegacyLo,s.RejectLegacyHi]=rate([r.pLegacy],cfg.Alpha);
+[s.RejectRaw,s.MCSERaw,~,s.RejectRawLo,s.RejectRawHi]=rate([r.pRaw],cfg.Alpha);
+[s.RejectShifted,s.MCSEShifted,~,s.RejectShiftedLo,s.RejectShiftedHi]=rate([r.pShifted],cfg.Alpha);
+[s.RejectOuterRaw,s.MCSEOuterRaw,s.OuterRawCompleted,s.RejectOuterRawLo,s.RejectOuterRawHi]=rate([r.pOuterRaw],cfg.Alpha);
+[s.RejectOuterCorrected,s.MCSEOuterCorrected,s.OuterCorrectedCompleted,s.RejectOuterCorrectedLo,s.RejectOuterCorrectedHi]= ...
     rate([r.pOuterCorrected],cfg.Alpha);
 end
 
-function [p,se,n]=rate(values,alpha)
-values=values(isfinite(values)); n=numel(values); p=NaN; se=NaN;
+function [p,se,n,lo,hi]=rate(values,alpha)
+values=values(isfinite(values)); n=numel(values); p=NaN; se=NaN; lo=NaN; hi=NaN;
 if n==0, return; end
 p=mean(values<alpha); se=sqrt(p*(1-p)/n);
+% Wilson interval remains informative after zero observed rejections.
+z=1.95996398454005; den=1+z^2/n;
+center=(p+z^2/(2*n))/den;
+half=z*sqrt(p*(1-p)/n+z^2/(4*n^2))/den;
+lo=max(0,center-half); hi=min(1,center+half);
 end
 
 function p=coverage(lower,truth)
@@ -366,9 +435,10 @@ R.Notes={ ...
     'Oracle finite-N target uses learned fitted weights, fixed lambda, and population projection conditional on those weights.', ...
     'Structural loss is algorithm-dependent because fitted endogenous component weights vary.', ...
     'Sample-reference estimates approximate the oracle target; their projection and scale error remain part of their bias.', ...
-    'All coverage values are one-sided lower-bound coverage, using independently estimated truth.', ...
-    'A boundary label means a Monte Carlo calibrated candidate, not an exact predictive null.', ...
-    'TruthMean is NaN after any failed training fit. CompleterMean is diagnostic only.', ...
+    'All coverage values are one-sided lower-bound coverage; the normal unpenalized Jp=1 bridge uses exact analytic truth, other regimes use independent training-risk estimates.', ...
+    'The normal unpenalized Jp=1 boundary is exact. Other boundary labels indicate Monte Carlo calibrated candidates.', ...
+    'TruthMCMean/TruthMCSE validate the analytic bridge independently; TargetMCSE is zero for analytic truth and the MCSE of estimated truth otherwise.', ...
+    'Any failed truth fit invalidates Monte Carlo truth. Analytic OLS truth remains known; numerical failures and validation status are reported separately. CompleterMean is diagnostic only.', ...
     'Rejection rates condition on valid datasets; always inspect failure counts.', ...
     'Outer bootstrap entries are NaN when Outer=0; nested_smoke is an execution check, not a calibration study.', ...
     'R=100 has rejection MCSE about .022 at p=.05; zero observed rejection does not establish zero population rejection.'};

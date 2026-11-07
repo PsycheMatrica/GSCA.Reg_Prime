@@ -2,7 +2,7 @@ name: GSCA correction research
 on:
   push:
     branches: [research/oob-correction-20261106]
-    paths: ['research/**', '.github/workflows/gsca-correction.yml']
+    paths: ['research/*.m', '.github/workflows/gsca-correction.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -10,6 +10,10 @@ jobs:
   matlab:
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        experiment: [primary, sensitivity, nested_boundary, nested_positive]
     steps:
       - uses: actions/checkout@v4
       - uses: matlab-actions/setup-matlab@v2
@@ -19,14 +23,14 @@ jobs:
         uses: matlab-actions/run-command@v2
         with:
           command: addpath('research'); test_gsca_fit; test_gsca_risk_maps; test_gsca_predictive;
-      - name: Moderate correction pilot
+      - name: Run bounded research experiment
         uses: matlab-actions/run-command@v2
         with:
-          command: addpath('research'); R=Run_Simulation_Correction_v3('ci'); fprintf('JSON_SUMMARY_BEGIN\\n'); disp(jsonencode(table2struct(R.Summary))); fprintf('JSON_SUMMARY_END\\n');
+          command: addpath('research'); run_research_experiment('${{ matrix.experiment }}');
       - name: Preserve results and seeds
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: gsca-correction-results
+          name: gsca-correction-${{ matrix.experiment }}
           path: research/results/
           if-no-files-found: ignore
