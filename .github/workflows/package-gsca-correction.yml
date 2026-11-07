@@ -1,0 +1,64 @@
+name: Package GSCA correction research
+on:
+  push:
+    branches: [research/oob-correction-20261106]
+    paths: ['.github/workflows/package-gsca-correction.yml']
+permissions:
+  contents: read
+  actions: read
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: b9546acbeea42a0fcc7929abdd5ebe0ecf8ea45e
+      - name: Wait for the bounded statistical study
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run watch 42323844916 --repo PsycheMatrica/GSCA.Reg_Prime --interval 30 --exit-status
+      - uses: actions/download-artifact@v4
+        with:
+          run-id: 42323844916
+          github-token: ${{ github.token }}
+          path: downloaded-results
+      - name: Create reproducible code and results bundle
+        run: |
+          python - <<'PY'
+          import base64, hashlib, io, json, pathlib, zipfile
+          root=pathlib.Path('.')
+          entries={}
+          for p in sorted(root.glob('*.m')): entries['code/'+p.name]=p.read_bytes()
+          for name in ['README.md','VERSION.txt','ACSI_Comp_Replica.csv']:
+              p=root/name
+              if p.exists(): entries['code/'+name]=p.read_bytes()
+          for pattern in ['*.m','*.md']:
+              for p in sorted((root/'research').glob(pattern)):
+                  entries['code/research/'+p.name]=p.read_bytes()
+          for p in sorted((root/'downloaded-results').rglob('*')):
+              if p.is_file():
+                  entries['results/'+p.relative_to(root/'downloaded-results').as_posix()]=p.read_bytes()
+          manifest={'source_commit':'b9546acbeea42a0fcc7929abdd5ebe0ecf8ea45e',
+              'study_commit':'a2b16cb509e51bb447b975c8ecfec64f97316a12',
+              'study_run':42323844916,'matlab':'R2026a',
+              'files':{k:{'bytes':len(v),'sha256':hashlib.sha256(v).hexdigest()} for k,v in entries.items()}}
+          entries['manifest.json']=json.dumps(manifest,indent=2).encode()
+          stream=io.BytesIO()
+          with zipfile.ZipFile(stream,'w',zipfile.ZIP_DEFLATED,compresslevel=9) as z:
+              for name,data in entries.items(): z.writestr(name,data)
+          payload=stream.getvalue()
+          pathlib.Path('GSCA_Correction_Research_Package.zip').write_bytes(payload)
+          meta={'bytes':len(payload),'sha256':hashlib.sha256(payload).hexdigest(),
+              'git_blob_sha':hashlib.sha1(('blob '+str(len(payload))+'\0').encode()+payload).hexdigest(),
+              'files':len(entries)}
+          print('PACKAGE_METADATA '+json.dumps(meta))
+          encoded=base64.b64encode(payload).decode()
+          print('PACKAGE_BASE64_BEGIN')
+          for offset in range(0,len(encoded),12000): print(encoded[offset:offset+12000])
+          print('PACKAGE_BASE64_END')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: GSCA_Correction_Research_Package
+          path: GSCA_Correction_Research_Package.zip
