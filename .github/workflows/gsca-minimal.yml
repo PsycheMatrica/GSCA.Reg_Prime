@@ -1,0 +1,53 @@
+name: GSCA minimal indicator and auxiliary update
+on:
+  push:
+    branches: [research/indicator-auxiliary-minimal-20261106]
+    paths: ['GSCA_Reg.m', 'GSCA_Indicator_OOB.m', 'research/*.m', '.github/workflows/gsca-minimal.yml']
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: matlab-actions/setup-matlab@v2
+        with:
+          release: R2026a
+          products: Statistics_and_Machine_Learning_Toolbox
+      - name: Verify original fitting and bootstrap flow are unchanged
+        uses: matlab-actions/run-command@v2
+        with:
+          command: addpath('research'); test_gsca_minimal_update; test_gsca_original_flow; run_minimal_indicator_example;
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gsca-minimal-validation
+          path: research/results_minimal/
+          if-no-files-found: ignore
+  simulate:
+    if: contains(github.event.head_commit.message, '[run-minimal-test]')
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        n: [80, 200]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: matlab-actions/setup-matlab@v2
+        with:
+          release: R2026a
+          products: Statistics_and_Machine_Learning_Toolbox
+      - name: Test only the two requested evaluation changes
+        uses: matlab-actions/run-command@v2
+        with:
+          command: addpath('research'); Run_Minimal_Indicator_Test(${{ matrix.n }});
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gsca-minimal-n${{ matrix.n }}
+          path: research/results_minimal/
+          if-no-files-found: error
+
