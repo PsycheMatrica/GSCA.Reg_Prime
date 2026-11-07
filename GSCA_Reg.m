@@ -65,6 +65,13 @@ if nargin<10; Flag_Parallel=false;
     end
 end
 
+% Predictive evaluation update only:
+% - In-bag auxiliary regressions replace focal component predictors.
+% - B-path losses average fixed raw observed target-indicator squared errors.
+% Original ALS, lambda selection, bootstrap draws, GoF and parameter summaries
+% are unchanged. There is no variance correction or nested bootstrap here.
+% TABLE.B columns 5:6 now use indicator-block Delta OPE.
+% TABLE.C retains its standardized-indicator loss, with auxiliary replacement.
 %% (1) Preliminary stage
     Z=Data;  
     [N,J]=size(Z);
@@ -168,6 +175,7 @@ end
     INI.W=est_W;
     INI.C=est_C;
     INI.B=est_B;
+    INI.indicatorOPE_byComponent=nan(1,P);
 
 %% (4) Estimation parameters for N_Boot
     if N_Boot<100
@@ -176,13 +184,19 @@ end
         TABLE.B=[est_B(B0),NaN(Nb,5)];
         ETC.W_Boot=[];
         ETC.C_Boot=[];
-        ETC.B_Boot=[];  
+        ETC.B_Boot=[];
+        ETC.delOPE_c_Boot=[]; ETC.delOPE_b_Boot=[];
+        ETC.delOPE_c_legacy_Boot=[]; ETC.delOPE_b_legacy_Boot=[];
+        ETC.indicatorOPE_Boot=[];  
     else
         W_Boot=zeros(Nw,N_Boot);
         C_Boot=zeros(Nc,N_Boot);
         B_Boot=zeros(Nb,N_Boot);
         delOPE_c_Boot=zeros(Nc,N_Boot);
         delOPE_b_Boot=zeros(Nb,N_Boot);
+        delOPE_c_legacy_Boot=zeros(Nc,N_Boot);
+        delOPE_b_legacy_Boot=zeros(Nb,N_Boot);
+        indicatorOPE_Boot=nan(P,N_Boot);
 
         OPE_Boot=zeros(3,N_Boot);    
         if Flag_Parallel
@@ -198,6 +212,7 @@ end
             %   (4) Predictabiliy 
             %   (4a) Err for model
                 %(4a-1) Scaling for Z_oob, est_W
+                Z_oob_raw=Z_oob;
                 N_oob=size(Z_oob,1);
                 Z_oob=(Z_oob-ones(N_oob,1)*mean_Z_ib)./(ones(N_oob,1)*std_Z_ib);
                 CV_oob=Z_oob*W_b;             
@@ -215,11 +230,15 @@ end
                 sum_es_dep_oob = sum(es_dep_oob,2);
                 OPE_Boot(:,b)=[(sum_em_dep_oob+sum_es_dep_oob)/Ty;sum_em_dep_oob/Jy;sum_es_dep_oob/Py]; % Error_oob for the measurement model
 
-                [delOPE_c_Boot(:,b),delOPE_b_Boot(:,b)]=Gen_delOPE(Z_oob,CV_oob, ...
+                [delOPE_c_legacy_Boot(:,b),delOPE_b_legacy_Boot(:,b)]=Gen_delOPE(Z_oob,CV_oob, ...
                                                                                     em_oob,es_oob, ...
                                                                                     C_b,B_b,C0,B0, ...
                                                                                     loc_c_t,loc_b_t,loc_Cdep,loc_Bdep, ...
                                                                                     N_oob,Nc,Nb);
+                indicator_eval=GSCA_Indicator_OOB(Z_ib,Z_oob_raw,W_b,C_b,B_b,C0,B0);
+                delOPE_c_Boot(:,b)=indicator_eval.delOPE_c;
+                delOPE_b_Boot(:,b)=indicator_eval.delOPE_b;
+                indicatorOPE_Boot(:,b)=indicator_eval.epeFull_by_target;
             end
         else
             for b=1:N_Boot
@@ -234,6 +253,7 @@ end
             %   (4) Predictabiliy 
             %   (4a) Err for model
                 %(4a-1) Scaling for Z_oob, est_W
+                Z_oob_raw=Z_oob;
                 N_oob=size(Z_oob,1);
                 Z_oob=(Z_oob-ones(N_oob,1)*mean_Z_ib)./(ones(N_oob,1)*std_Z_ib);
                 CV_oob=Z_oob*W_b;             
@@ -251,11 +271,15 @@ end
                 sum_es_dep_oob = sum(es_dep_oob,2);
                 OPE_Boot(:,b)=[(sum_em_dep_oob+sum_es_dep_oob)/Ty;sum_em_dep_oob/Jy;sum_es_dep_oob/Py]; % Error_oob for the measurement model
     
-                [delOPE_c_Boot(:,b),delOPE_b_Boot(:,b)]=Gen_delOPE(Z_oob,CV_oob, ...
+                [delOPE_c_legacy_Boot(:,b),delOPE_b_legacy_Boot(:,b)]=Gen_delOPE(Z_oob,CV_oob, ...
                                                                                      em_oob,es_oob, ...
                                                                                      C_b,B_b,C0,B0, ...
                                                                                      loc_c_t,loc_b_t,loc_Cdep,loc_Bdep, ...
                                                                                      N_oob,Nc,Nb);
+                indicator_eval=GSCA_Indicator_OOB(Z_ib,Z_oob_raw,W_b,C_b,B_b,C0,B0);
+                delOPE_c_Boot(:,b)=indicator_eval.delOPE_c;
+                delOPE_b_Boot(:,b)=indicator_eval.delOPE_b;
+                indicatorOPE_Boot(:,b)=indicator_eval.epeFull_by_target;
             end
         end
 
@@ -274,7 +298,13 @@ end
         if Py>0; TABLE.B=para_stat(est_B(B0),B_Boot,loc_CI,delOPE_b_Boot); end
         ETC.W_Boot=W_Boot;
         ETC.C_Boot=C_Boot;
-        ETC.B_Boot=B_Boot;  
+        ETC.B_Boot=B_Boot;
+        ETC.delOPE_c_Boot=delOPE_c_Boot;
+        ETC.delOPE_b_Boot=delOPE_b_Boot;
+        ETC.delOPE_c_legacy_Boot=delOPE_c_legacy_Boot;
+        ETC.delOPE_b_legacy_Boot=delOPE_b_legacy_Boot;
+        ETC.indicatorOPE_Boot=indicatorOPE_Boot;
+        INI.indicatorOPE_byComponent=mean(indicatorOPE_Boot,2)';  
     end
 Results.INI=INI;
 Results.TABLE=TABLE;
