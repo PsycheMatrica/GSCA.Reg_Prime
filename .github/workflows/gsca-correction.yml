@@ -24,6 +24,7 @@ jobs:
         with:
           command: addpath('research'); test_gsca_fit; test_gsca_risk_maps; test_gsca_predictive;
       - name: Run bounded research experiment
+        if: contains(github.event.head_commit.message, '[run-study]') || github.event_name == 'workflow_dispatch'
         uses: matlab-actions/run-command@v2
         with:
           command: addpath('research'); run_research_experiment('${{ matrix.experiment }}');

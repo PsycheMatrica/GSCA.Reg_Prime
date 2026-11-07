@@ -14,6 +14,14 @@ assert(isequal(r.pRaw,mean(r.draws.raw<=0,1)));
 s=sort(r.draws.raw,1); expected=s(ceil(.05*o.Boot),:);
 assert(isequal(r.lowerRaw,expected));
 assert(isequal(r.lowerRaw>0,r.pRaw<.05));
+% An exact grid probability must not cross bins through roundoff.
+[pgrid,lgrid]=gsca_percentile([zeros(7,1);ones(93,1)],.07);
+assert(pgrid==.07 && lgrid==0 && ~(pgrid<.07));
+[pgrid,lgrid]=gsca_percentile([zeros(7,1);ones(93,1)],.07000000000000002);
+assert(lgrid==1 && pgrid<.07000000000000002);
+threw=false;
+try, gsca_percentile([0;Inf],.05); catch, threw=true; end
+assert(threw,'Nonfinite draws must not produce a p-value.');
 % Seed controls every resample and preserves caller RNG.
 st=rng; r2=gsca_predictive(Data,W0,C0,B0,o); after=rng;
 assert(isequal(st,after)); assert(isequal(r.draws.raw,r2.draws.raw));

@@ -30,9 +30,9 @@ if isempty(refMu), refMu=mean(Data,1); end
 if isempty(refSigma), refSigma=cov(Data,1); end
 out.referenceMean=refMu; out.referenceCov=refSigma;
 if isempty(opts.ReferenceCov)
-    out.referenceMode='sample-X plug-in';
+    out.referenceMode='full-data indicator-moment plug-in (including target scale)';
 else
-    out.referenceMode='externally specified X moments';
+    out.referenceMode='external covariance; reference mean follows ReferenceMean option';
 end
 initial=gsca_fit(Data,W0,C0,B0,opts.Lambda,opts);
 out.fit=initial;
@@ -62,6 +62,10 @@ for b=1:opts.Boot
     if any(~isfinite([ef(:);eg(:);ez(:)]))
         out.failures=out.failures+1; fitReasons{b}='nonfinite loss'; continue
     end
+    losses=[ef.^2,eg.^2,ez.^2];
+    if any(~isfinite(losses(:)))
+        out.failures=out.failures+1; fitReasons{b}='nonfinite squared loss'; continue
+    end
     counts(oob)=counts(oob)+1;
     sumF(oob,:)=sumF(oob,:)+ef; sumG(oob,:)=sumG(oob,:)+eg;
     sumF2(oob,:)=sumF2(oob,:)+ef.^2; sumG2(oob,:)=sumG2(oob,:)+eg.^2;
@@ -75,9 +79,16 @@ if out.failures>0 || any(counts<2)
     out.reason='At least one failed draw or fewer than two OOB evaluations; no inference returned.';
     return
 end
+if any(~isfinite([sumF(:);sumG(:);sumF2(:);sumG2(:)]))
+    out.reason='Nonfinite accumulated residual moments.'; return
+end
+centerF=sumF2-sumF.^2./counts; centerG=sumG2-sumG.^2./counts;
+if any(~isfinite([centerF(:);centerG(:)]))
+    out.reason='Nonfinite centered residual moments.'; return
+end
 rawByRow=(sumG2-sumF2)./counts;
-sF2=max(0,(sumF2-sumF.^2./counts)./(counts-1));
-sG2=max(0,(sumG2-sumG.^2./counts)./(counts-1));
+sF2=max(0,centerF./(counts-1));
+sG2=max(0,centerG./(counts-1));
 correctionByRow=sF2-sG2;
 out.deltaRaw=mean(rawByRow,1);
 out.correction=mean(correctionByRow,1);
@@ -87,9 +98,14 @@ out.rawReplicateMean=mean(draws,1);
 out.baggedLossDifference=mean((sumG./counts).^2-(sumF./counts).^2,1);
 out.finiteBootAdjustment=mean(correctionByRow./counts,1);
 out.identityError=max(abs(out.deltaCorrected-out.baggedLossDifference-out.finiteBootAdjustment));
-[out.pRaw,out.lowerRaw]=summarize(draws,opts.Alpha);
-[out.pLegacy,out.lowerLegacy]=summarize(zeroDraws,opts.Alpha);
-[out.pShifted,out.lowerShifted]=summarize(draws+out.correction,opts.Alpha);
+if any(~isfinite([out.deltaRaw,out.correction,out.deltaCorrected,...
+        out.legacyRaw,out.rawReplicateMean,out.baggedLossDifference,...
+        out.finiteBootAdjustment,out.identityError]))
+    out.reason='Nonfinite risk summary.'; return
+end
+[out.pRaw,out.lowerRaw]=gsca_percentile(draws,opts.Alpha);
+[out.pLegacy,out.lowerLegacy]=gsca_percentile(zeroDraws,opts.Alpha);
+[out.pShifted,out.lowerShifted]=gsca_percentile(draws+out.correction,opts.Alpha);
 out.valid=true; out.reason='ok';
 out.rejectionRule='lower > 0, equivalent to empirical p < Alpha (strict at ties)';
 out.interpretation='Residual-variance/bagging correction candidate; not proven finite-N GSCA bias correction.';
@@ -112,15 +128,10 @@ if opts.Outer>0
         'failureReasons',{outerReasons},'failed',sum(any(~isfinite(outerCorrected),2)));
     out.outerValid=out.outer.failed==0;
     if out.outerValid
-        [out.pOuterRaw,out.lowerOuterRaw]=summarize(outerRaw,opts.Alpha);
-        [out.pOuterCorrected,out.lowerOuterCorrected]=summarize(outerCorrected,opts.Alpha);
+        [out.pOuterRaw,out.lowerOuterRaw]=gsca_percentile(outerRaw,opts.Alpha);
+        [out.pOuterCorrected,out.lowerOuterCorrected]=gsca_percentile(outerCorrected,opts.Alpha);
     end
 end
-end
-
-function [p,lower]=summarize(x,alpha)
-p=mean(x<=0,1);
-s=sort(x,1); lower=s(max(1,ceil(alpha*size(x,1))),:);
 end
 
 function o=defaults(o)
