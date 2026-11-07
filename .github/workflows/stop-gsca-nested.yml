@@ -1,0 +1,19 @@
+name: Stop superseded nested experiment
+on:
+  push:
+    branches: [research/oob-correction-20261106]
+    paths: ['.github/workflows/stop-gsca-nested.yml']
+permissions:
+  actions: write
+jobs:
+  stop:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Stop exploratory nested work and retain completed primary artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          status=$(gh run view 42336898888 --repo PsycheMatrica/GSCA.Reg_Prime --json status --jq .status)
+          if [ "$status" != "completed" ]; then
+            gh run cancel 42336898888 --repo PsycheMatrica/GSCA.Reg_Prime
+          fi
