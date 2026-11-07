@@ -1,6 +1,8 @@
 # GSCA OOB correction experiment
 
-This research module evaluates corrections for the unnormalized predictive contribution \(\Delta\mathrm{EPE}_p(N)\). It keeps the public `GSCA_Reg` interface unchanged. The methods below are experimental: a computational check is not evidence of predictive-null calibration.
+Completed exploratory results: [Korean report](GSCA_Correction_Report_KO.md), [summary CSV](results/GSCA_Correction_Summary.csv), and [code/results package](results/GSCA_Correction_Research_Package.zip).
+
+This research module evaluates corrections for the unnormalized predictive contribution $\Delta\mathrm{EPE}_p(N)$. It keeps the public `GSCA_Reg` interface unchanged. The methods below are experimental: a computational check is not evidence of predictive-null calibration.
 
 ## Target and replacement
 
@@ -12,53 +14,53 @@ A fixed first-indicator sign convention is used in every fit, with explicit fail
 
 ## Candidate correction
 
-Let \(e_{1,bi}\) and \(e_{-p,bi}\) be the paired full and removed residuals for observation \(i\) when it is OOB in draw \(b\). With \(K_i\) such draws,
+Let $e_{1,bi}$ and $e_{-p,bi}$ be the paired full and removed residuals for observation $i$ when it is OOB in draw $b$. With $K_i$ such draws,
 
-\[
+$$
 \widehat{\Delta\mathrm{EPE}}_p^{\mathrm{raw}}
 =\frac1N\sum_i\overline{(e_{-p,bi}^2-e_{1,bi}^2)},\qquad
 \widehat C_p=\frac1N\sum_i\{s^2(e_{1,bi})-s^2(e_{-p,bi})\},
-\]
-\[
+$$
+$$
 \widehat{\Delta\mathrm{EPE}}_p^{\mathrm{VC}}
 =\widehat{\Delta\mathrm{EPE}}_p^{\mathrm{raw}}+\widehat C_p.
-\]
+$$
 
-The sample variances use divisor \(K_i-1\). Each original observation has equal weight; `rawReplicateMean` is also returned to identify the separate effect of aggregation. **The correction may be negative.**
+The sample variances use divisor $K_i-1$. Each original observation has equal weight; `rawReplicateMean` is also returned to identify the separate effect of aggregation. **The correction may be negative.**
 
 This construction satisfies the exact identity
 
-\[
+$$
 \widehat{\Delta\mathrm{EPE}}_p^{\mathrm{VC}}
 =\frac1N\sum_i(\bar e_{-p,i}^{\,2}-\bar e_{1,i}^{\,2})
 +\frac1N\sum_i\frac{s^2(e_{1,bi})-s^2(e_{-p,bi})}{K_i}.
-\]
+$$
 
-It is a bagging/finite-bootstrap identity. It is **not a theorem that this estimates the original unbagged finite-N target without bias**. It removes a variance contribution but need not remove second-order bias of learned weights or penalized coefficients. The simulation compares it with independent-training truth rather than assuming the OLS \(+C\) result transfers.
+It is a bagging/finite-bootstrap identity. It is **not a theorem that this estimates the original unbagged finite-N target without bias**. It removes a variance contribution but need not remove second-order bias of learned weights or penalized coefficients. The simulation compares it with independent-training truth rather than assuming the OLS $+C$ result transfers.
 
-If the outcome \(t_b\) changes with the fitted weights, using prediction variances alone is incorrect:
+If the outcome $t_b$ changes with the fitted weights, using prediction variances alone is incorrect:
 
-\[
+$$
 s^2(t_b-f_b)-s^2(t_b-g_b)
 =s_f^2-s_g^2-2\widehat{\operatorname{Cov}}(t_b,f_b-g_b).
-\]
+$$
 
 The implementation uses residuals throughout.
 
 ## One-sided percentile candidates
 
-All predictive bounds are one-sided lower bounds at \(\alpha=.05\). No two-sided predictive interval is substituted.
+All predictive bounds are one-sided lower bounds at $\alpha=.05$. No two-sided predictive interval is substituted.
 
 | Output | Interpretation |
 |---|---|
 | `pLegacy`, `lowerLegacy` | Zero-deletion OOB benchmark, on the comparable outcome scale |
 | `pRaw`, `lowerRaw` | Projection replacement; empirical percentile of individual OOB replicate loss differences |
-| `pShifted`, `lowerShifted` | Same replicate distribution shifted by \(\widehat C_p\); a diagnostic, not a sampling-distribution repair |
+| `pShifted`, `lowerShifted` | Same replicate distribution shifted by $\widehat C_p$; a diagnostic, not a sampling-distribution repair |
 | `pOuterRaw`, `pOuterCorrected` | Outer pairs bootstrap of the entire raw or corrected aggregate; all training, projection and correction repeated |
 
 Zero deletion and projection replacement define different removal estimands under correlated parents. The legacy rejection rate at the projection boundary is a comparator, not automatically Type I error for the legacy method's own target.
 
-For draws \(T_b\), \(p=B^{-1}\sum_b1(T_b\le0)\). Bounds use the inverse empirical CDF; the numerical rank is adjusted at floating-point grid boundaries to agree with comparisons of k/B to alpha. Reject when the lower bound is positive, equivalent to \(p<\alpha\), with a strict inequality at finite-B ties. An observed \(p=0\) means zero nonpositive Monte Carlo draws, not an exactly zero population tail probability.
+For draws $T_b$, $p=B^{-1}\sum_b1(T_b\le0)$. Bounds use the inverse empirical CDF; the numerical rank is adjusted at floating-point grid boundaries to agree with comparisons of k/B to alpha. Reject when the lower bound is positive, equivalent to $p<\alpha$, with a strict inequality at finite-B ties. An observed $p=0$ means zero nonpositive Monte Carlo draws, not an exactly zero population tail probability.
 
 Ordinary nested bootstrap uses outer-sample **positions**, including duplicate values, as its inner sampling units. It does not claim that repeated original source IDs are independent held-out population observations. Excluding all copies by source ID would define a different estimator. Finite inner-bootstrap noise remains and should be checked by increasing `InnerBoot`.
 
@@ -92,7 +94,7 @@ A failed fit, empty OOB draw, invalid projection, or insufficient OOB coverage i
 
 The controlled design has two correlated predictor components and one endogenous component, with singleton indicators for the OLS bridge and three indicators per component for learned-weight GSCA. Fixed zero and positive regularization are separated. The coefficient-zero case, an estimated finite-N predictive boundary, and a positive coefficient are distinct conditions.
 
-Each fitted residual is affine in raw X. Known population moments give its exact conditional risk; independent training sets then estimate \(\Delta\mathrm{EPE}_p(N)\). Boundary calibration uses separate random streams from truth validation and performance simulation. Calibration MCSE is reported: an approximate boundary is not an exact known null. Type I error/power labels require the sign of validated predictive truth, not just a coefficient-zero/nonzero label.
+Each fitted residual is affine in raw X. Known population moments give its exact conditional risk; independent training sets then estimate $\Delta\mathrm{EPE}_p(N)$. Boundary calibration uses separate random streams from truth validation and performance simulation. Calibration MCSE is reported: an approximate boundary is not an exact known null. Type I error/power labels require the sign of validated predictive truth, not just a coefficient-zero/nonzero label.
 
 The planned comparisons include raw/corrected bias and RMSE, one-sided lower-bound coverage, rejection rates with Monte Carlo uncertainty, solver failures, and oracle versus sample-X references. Small nested runs establish executability only. Broader nested simulations, increased B, additional sample sizes, heteroscedasticity and the original ACSI design are needed before choosing a final procedure.
 
@@ -101,3 +103,5 @@ The planned comparisons include raw/corrected bias and RMSE, one-sided lower-bou
 The research solver preserves the GSCA mean-loss penalty convention and uses covariance algebra equivalent to the original weight-update direction. It refreshes dependent component targets during coordinate updates, refits coefficients before reporting the objective, handles measurement-only models, records convergence, and rejects ill-conditioned required subproblems. These changes mean numerical differences from legacy output can reflect solver fixes as well as inference changes. Production files are retained for explicit comparisons.
 
 No empirical correction coefficient is tuned to make a reported rejection rate equal .05.
+
+Statistical studies run on manual workflow dispatch or commits whose message includes `[run-study]`; ordinary code changes run the checks only. See `run_research_experiment.m` for the completed experiment settings.
