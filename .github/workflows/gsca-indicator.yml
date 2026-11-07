@@ -1,0 +1,52 @@
+name: GSCA fixed indicator research
+on:
+  push:
+    branches: [research/oob-correction-20261106]
+    paths: ['research/*indicator*.m', 'research/*Indicator*.m', '.github/workflows/gsca-indicator.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: matlab-actions/setup-matlab@v2
+        with:
+          release: R2026a
+      - name: Check old and new risk definitions
+        uses: matlab-actions/run-command@v2
+        with:
+          command: addpath('research'); test_gsca_fit; test_gsca_risk_maps; test_gsca_predictive; test_gsca_indicator_maps; test_gsca_indicator_predictive; run_indicator_experiment('smoke'); run_indicator_experiment('nested_smoke');
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gsca-indicator-validation
+          path: research/results_indicator/
+          if-no-files-found: ignore
+  simulate:
+    if: contains(github.event.head_commit.message, '[run-indicator-study]') || github.event_name == 'workflow_dispatch'
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        experiment: [primary_n80_jp1, primary_n80_jp3, primary_n200_jp1, primary_n200_jp3, nested_n80_sample_boundary, nested_n80_sample_positive, nested_n80_oracle_boundary, nested_n200_hetero_sample_boundary, nested_n80_sample_boundary_inner199]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: matlab-actions/setup-matlab@v2
+        with:
+          release: R2026a
+      - name: Run fixed indicator experiment
+        uses: matlab-actions/run-command@v2
+        with:
+          command: addpath('research'); run_indicator_experiment('${{ matrix.experiment }}');
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gsca-indicator-${{ matrix.experiment }}
+          path: research/results_indicator/
+          if-no-files-found: error
+
