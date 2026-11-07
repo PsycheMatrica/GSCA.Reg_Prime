@@ -18,7 +18,7 @@ jobs:
       - name: Check old and new risk definitions
         uses: matlab-actions/run-command@v2
         with:
-          command: addpath('research'); test_gsca_fit; test_gsca_risk_maps; test_gsca_predictive; test_gsca_indicator_maps; test_gsca_indicator_predictive; run_indicator_experiment('smoke'); run_indicator_experiment('nested_smoke');
+          command: addpath('research'); test_gsca_fit; test_gsca_risk_maps; test_gsca_predictive; test_gsca_indicator_maps; test_gsca_indicator_predictive; run_indicator_experiment('smoke'); run_indicator_experiment('nested_smoke'); run_indicator_example;
       - uses: actions/upload-artifact@v4
         if: always()
         with:
